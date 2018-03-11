@@ -49,8 +49,8 @@ Here is an example of a autostart object to put in the array `autostart_config`:
 	respawn_on_awesome_restart = true -- if set to true, this entry will be started with `awesome`'s restarts
 }
 ```
-A full example of a configuration file is included in the repository to be used like this:
+A full example of a configuration file is included in the repository. You can copy it to `config.lua`, edit it and use it like this:
 
 ```lua
-autostart(require('autostart/example-config'))
+autostart(require('autostart/config'))
 ```
