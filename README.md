@@ -12,7 +12,8 @@ Usually, what most users want is to define a list of system tray applications th
 
 ### Installation
 
-Clone the repository to your awesome configuration directory.
+1. Clone the repository to your awesome configuration directory.
+2. Install the luarock module [lualogging](https://github.com/Neopallium/lualogging) (`luarocks install lualogging`).
 
 ### Usage
 
