@@ -43,11 +43,11 @@ return function (config, verbosity, logs_dir_path, pidfiles_dir_path)
 			local pid = awful.spawn.with_line_callback(config[i].bin, {
 				stdout = function(line)
 					program[i].log = io.open(program[i].log_fp, 'a')
-					program[i].logger:write(line, '\n')
+					program[i].log:write(line, '\n')
 				end,
 				stderr = function(line)
 					program[i].log = io.open(program[i].log_fp, 'a')
-					program[i].logger:write(line, '\n')
+					program[i].log:write(line, '\n')
 				end,
 				exit = function(reason, code)
 					if reason == 'exit' then
