@@ -3,13 +3,13 @@ local awful = require("awful")
 local naughty = require("naughty")
 
 pcall(require, "luarocks.loader")
-local logging = require('log4l')
+local logger = require('logger')
 
 return function (config)
 	local obj = {}
 	obj.start = function()
 		-- Operate on config.programs
 	end
-	obj.logger = logging.new(config.log.handler, config.log.settings)
+	obj.logger = logger(config.log.handler, config.log.settings)
 	return obj
 end
