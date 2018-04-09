@@ -3,11 +3,12 @@ local awful = require("awful")
 local naughty = require("naughty")
 
 pcall(require, "luarocks.loader")
-local logging = require('logging')
-local logger = logging.new(function(self, level, message)
-	io.stdout:write(logging.prepareLogMsg(logPattern, os.date(), level, message))
+local logger = require('logger')
+local logger = logger(function(self, level, message)
+	io.stdout:write(level .. "\t" .. message .. "\n")
 	return true
 end)
+logger:setLevel('ERROR')
 
 return function (config, logs_dir_path, pidfiles_dir_path)
 	local logs = logs_dir_path or gears.filesystem.get_cache_dir() .. 'logs/'
