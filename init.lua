@@ -45,8 +45,8 @@ autostart.new = function(config)
 		else
 			logger = ret.logger
 		end
-		prog.pid_fp = prog.pid_fp or config.pids_path .. prog.name .. '.pid'
-		logger:debug('The pid file path of ' .. prog.name .. ' is: ' .. prog.pid_fp)
+		local pid_fp = prog.pid_fp or config.pids_path .. prog.name .. '.pid'
+		logger:debug('The pid file path of ' .. prog.name .. ' is: ' .. pid_fp)
 		prog.spawn = function()
 			local pid = awful.spawn.with_line_callback(prog.bin, {
 				stdout = function(line)
@@ -63,16 +63,16 @@ autostart.new = function(config)
 					else
 						logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
 					end
-					if os.remove(prog.pid_fp) then
+					if os.remove(pid_fp) then
 						logger:debug('Succesfully removed pid file for ' .. prog.name)
 					else
 						logger:warn('Failed to remove pid file for ' .. prog.name)
 					end
 				end
 			})
-			prog.pid = io.open(prog.pid_fp, 'w')
-			prog.pid:write(pid)
-			prog.pid:close()
+			local pid_file = io.open(pid_fp, 'w')
+			pid_file:write(pid)
+			pid_file:close()
 		end
 		if prog.delay then
 			prog.spawn_this = function()
@@ -87,13 +87,13 @@ autostart.new = function(config)
 		else
 			prog.spawn_this = prog.spawn
 		end
-		if gears.filesystem.file_readable(prog.pid_fp) then
+		if gears.filesystem.file_readable(pid_fp) then
 			if prog.respawn_on_awesome_restart == true then
-				prog.pid = io.open(prog.pid_fp, 'r')
-				local pid = prog.pid:read("*n")
+				local pid_file = io.open(pid_fp, 'r')
+				local pid = pid_file:read("*n")
 				logger:debug('pid of ' .. prog.name .. ' is: ' .. pid)
 				if awesome.kill(pid, awesome.unix_signal['SIGTERM']) then
-					os.remove(prog.pid_fp)
+					os.remove(pid_fp)
 				else
 					logger:info('killing ' .. prog.name .. ' failed' )
 				end
