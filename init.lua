@@ -77,12 +77,12 @@ autostart.new = function(config)
 		if prog.delay then
 			prog.spawn_this = function()
 				logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
-				prog.timer = gears.timer({
+				local timer = gears.timer({
 					timeout = prog.delay,
 					callback = prog.spawn,
 					single_shot = true
 				})
-				prog.timer:start()
+				timer:start()
 			end
 		else
 			prog.spawn_this = prog.spawn
