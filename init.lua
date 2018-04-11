@@ -36,7 +36,7 @@ autostart.new = function(config)
 		ret.logger:debug('Creating directories for pid files: ' .. config.pids_path)
 	else
 		logger:fatal('Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path)
-		return
+		return nil, 'Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path
 	end
 	ret.run = {}
 	for i = 1,#config.programs do
