@@ -35,7 +35,7 @@ autostart.new = function(config)
 	if gears.filesystem.make_directories(config.pids_path) then
 		ret.logger:debug('Creating directories for pid files: ' .. config.pids_path)
 	else
-		logger:fatal('Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path)
+		ret.logger:fatal('Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path)
 		return nil, 'Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path
 	end
 	ret.run = function(prog)
