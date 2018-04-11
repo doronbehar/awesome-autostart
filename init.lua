@@ -39,33 +39,34 @@ autostart.new = function(config)
 		return nil, 'Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path
 	end
 	ret.run = function(prog)
+		local logger
 		if type(prog.log) == 'table' then
-			prog.logger = Logger(prog.log.handler, prog.log.settings)
+			logger = Logger(prog.log.handler, prog.log.settings)
 		else
-			prog.logger = ret.logger
+			logger = ret.logger
 		end
 		prog.pid_fp = prog.pid_fp or config.pids_path .. prog.name .. '.pid'
-		prog.logger:debug('The pid file path of ' .. prog.name .. ' is: ' .. prog.pid_fp)
+		logger:debug('The pid file path of ' .. prog.name .. ' is: ' .. prog.pid_fp)
 		prog.spawn = function()
 			local pid = awful.spawn.with_line_callback(prog.bin, {
 				stdout = function(line)
-					prog.logger:info(prog.name .. ':' .. line)
+					logger:info(prog.name .. ':' .. line)
 				end,
 				stderr = function(line)
-					prog.logger:error(prog.name .. ':' .. line)
+					logger:error(prog.name .. ':' .. line)
 				end,
 				exit = function(reason, code)
 					if reason == 'exit' then
-						prog.logger:warn(prog.name .. ' exited with code: ' .. code)
+						logger:warn(prog.name .. ' exited with code: ' .. code)
 					elseif reason == 'signal' then
-						prog.logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
+						logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
 					else
-						prog.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
+						logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
 					end
 					if os.remove(prog.pid_fp) then
-						prog.logger:debug('Succesfully removed pid file for ' .. prog.name)
+						logger:debug('Succesfully removed pid file for ' .. prog.name)
 					else
-						prog.logger:warn('Failed to remove pid file for ' .. prog.name)
+						logger:warn('Failed to remove pid file for ' .. prog.name)
 					end
 				end
 			})
@@ -75,7 +76,7 @@ autostart.new = function(config)
 		end
 		if prog.delay then
 			prog.spawn_this = function()
-				prog.logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
+				logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
 				prog.timer = gears.timer({
 					timeout = prog.delay,
 					callback = prog.spawn,
@@ -90,16 +91,16 @@ autostart.new = function(config)
 			if prog.respawn_on_awesome_restart == true then
 				prog.pid = io.open(prog.pid_fp, 'r')
 				local pid = prog.pid:read("*n")
-				prog.logger:debug('pid of ' .. prog.name .. ' is: ' .. pid)
+				logger:debug('pid of ' .. prog.name .. ' is: ' .. pid)
 				if awesome.kill(pid, awesome.unix_signal['SIGTERM']) then
 					os.remove(prog.pid_fp)
 				else
-					prog.logger:info('killing ' .. prog.name .. ' failed' )
+					logger:info('killing ' .. prog.name .. ' failed' )
 				end
 				prog.spawn_this()
 			end
 		else
-			prog.logger:error('The pid file of ' .. prog.name .. ' was not found!')
+			logger:error('The pid file of ' .. prog.name .. ' was not found!')
 			prog.spawn_this()
 		end
 	end
