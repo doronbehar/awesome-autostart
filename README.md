@@ -2,38 +2,36 @@
 
 > autostart made easy
 
-### Intro
+### Motivation
 
-We all know Awesome WM is a window manager and no more. What this module strives to accomplish is to provide a comfortable way to manage applications which should be started automatically when one opens a new `awesome` session.
+[Awesome WM](http://awesomewm.org/) is a window manager and no more. This module strives to provide a comfortable way to manage applications which should be started automatically when one opens a new `awesome` session.
 
 Usually, what most users want is to define a list of system tray applications that should be started when running `startx`. Most people are satisfied with putting those shell commands in `~/.xprofile` but this has some drawbacks:
 
 - No notifications when a program exits unexpectedly.
-- The `STDOUT` of the programs is naturally printed in the tty from which `startx` was invoked, therefor - no native support for log files
-- If one just restarts `awesome`, there is no solution with `~/.xprofile` for applications which need a consistent system tray handler and you want them to restart with `awesome`. (More details in [Usage](#Usage))
+- The `STDOUT` of the programs is naturally printed in the tty from which `startx` was invoked, meaning there's no native support for log files / desktop notifications for messages which those programs usually print to the tty's `STDERR`.
+- With `~/.xprofile`, if you restart `awesome`, there is no way to tell an applications which need a consistent system tray handler you want to restart it **together** with `awesome` and perhaps even after a small delay. (More details about this specific problem and it's solution  in [Usage](#Usage))
 
 ### Installation
 
-This module can be cloned to your `awesome` configuration dir and be used right after you configure it as explained in more details later on. It consists of a submodule called `log4l` so **Remember to initialize and update the submodule found in the repo as well**, more info about git submodules here:
-
-[https://git-scm.com/book/en/v2/Git-Tools-Submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
+I recommend most people to just clone it to your `awesome` configuration dir (usually `~/.config/awesome`) and it should be usable right after you configure it as explained in more details later on. There is one dependency though which is [`lua-logger`](https://github.com/doronbehar/lua-logger) so **Remember to [install](https://github.com/doronbehar/lua-logger#installation) it as well and keep it updated as long as you keep updating this repo as well.**
 
 ### Usage
 
 Import the module to your `rc.lua`:
 
 ```lua
-local autostart = require('autostart')
+local Autostart = require('autostart')
 -- ...
--- Whenever you wish, invoke the function `autostart` with your `autostart_config` object.
+-- Whenever you wish, invoke the function `autostart` with your `autostart_config` table.
 -- Usually, it is recommended to do so after defining all the tags, tasklist and widgets in `rc.lua`.
 
 autostart_config = {
   -- ... More details on configuration latter ...
 }
 
-local autostarter = autostart(autostart_config)
-autostarter.run()
+local autostarter = Autostart(autostart_config)
+autostarter.run_all()
 ```
 
 ### Configuration
@@ -45,17 +43,17 @@ First of all, the configuration consists of two sections and it can look like:
 ```lua
 return {
   programs = {
-    -- list of programs objects as explaind later on
+    -- array of a table for each program as explaind later on
   }
   log = {
     handler = function (self, level, message) 
       -- a logger function that handles the log info and outputs it to the
-      -- console, the desktop session or to a file, be creative!
+      -- console, the desktop session or to a file, your choice.
       -- If you don't feel creative enough to create something usefull here,
       -- you can check the examples in the repositories dir `examples/`.
     end,
     settings = {
-      -- a set of parameters that define the default settings of the logger object
+      -- a set of parameters that define the default settings of the logger table
       -- More detailes later on..
     }
   }
@@ -71,7 +69,8 @@ A configuration for each autostart program is needed for two scenarios:
 * A program needs to be started in delay (I know you can `sleep` in your `~/.xprofile` but `awesome-autostart` strives to solve this as well more elegantly).
 * A program needs to run and quit but you want still to know if it exited with non-zero value.
 
-Here is an example of a `programs` object to put in `autostart_config` object to give as an argument to `autostart()`:
+Here is an example of a `programs` table to put in `autostart_config` table to give as an argument to `autostart()`:
+
 ```lua
 programs = {
   name = 'polybar', -- Used when creating log files, don't put here spaces or other special characters
@@ -93,17 +92,17 @@ Here is another example of program with the `oneshot` variable set to `true`:
 
 #### Configuring the `log`
 
-The `log` object is meant to be used with a library which was originally called `lualogging` but I forked it and now it is called `log4l`. It is available as a submodule in this repo so don't forget to initialize it and update it along with updates to `autostart` as well.
+The `autostart` module depends on a library I forked which is now called [lua-logger](http://github.com/doronbehar/lua-logger). The `log` table's `handler` function and the `settings` table are meant to become the input of the Logger constructor as explained [here](http://github.com/doronbehar/lua-logger#usage).
 
-The `log` object consists of a function called `handler` and a `settings` object.
+The `log` table should consist of a function called `handler` and a `settings` table. They both correspond to what the
 
-##### The `settings` object
+##### The `settings` table
 
-<!-- TODO -->
+See [lua-logger/README.md#configuration](http://github.com/doronbehar/lua-logger#configuration)
 
 ##### The `handler` function
 
-Receives the `self` object, the current log level and the message to display.
+See [lua-logger/README.md#the-appender-function](http://github.com/doronbehar/lua-logger#the-appender-function)
 
 ### Recommended usage
 
