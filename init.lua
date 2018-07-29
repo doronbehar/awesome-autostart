@@ -61,6 +61,10 @@ autostart.new = function(config)
 				end
 			end
 		})
+		if type(pid) == "string" then
+			ret.logger:fatal(pid)
+			return pid
+		end
 		local pid_file = io.open(pid_fp, 'w')
 		pid_file:write(pid)
 		pid_file:close()
