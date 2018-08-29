@@ -84,7 +84,9 @@ autostart.new = function(config)
 				local pid_file = io.open(pid_fp, 'r')
 				local pid = pid_file:read("*n")
 				ret.logger:debug('pid of ' .. prog.name .. ' is: ' .. pid)
-				if awesome.kill(pid, awesome.unix_signal['SIGTERM']) then
+				-- usefull only when having patch:
+				-- https://github.com/awesomeWM/awesome/commit/b3311674d2073a0fdea35f033dcc06d6373d4873.patch
+				if awesome.kill(-pid, awesome.unix_signal['SIGTERM']) then
 					pid_file:close()
 					if os.remove(pid_fp) then
 						ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
