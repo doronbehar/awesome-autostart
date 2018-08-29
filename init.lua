@@ -39,74 +39,72 @@ autostart.new = function(config)
 		return nil, 'Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path
 	end
 	ret.spawn = function(prog, pid_fp)
-		local pid = awful.spawn.with_line_callback(prog.bin, {
-			stdout = function(line)
-				ret.logger:info(prog.name .. ':' .. line)
-			end,
-			stderr = function(line)
-				ret.logger:error(prog.name .. ':' .. line)
-			end,
-			exit = function(reason, code)
-				if reason == 'exit' then
-					ret.logger:warn(prog.name .. ' exited with code: ' .. code)
-				elseif reason == 'signal' then
-					ret.logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
-				else
-					ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
-				end
-				if os.remove(pid_fp) then
-					ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
-				else
-					ret.logger:warn('Failed to remove pid file for ' .. prog.name)
-				end
-			end
-		})
-		if type(pid) == "string" then
-			ret.logger:fatal(pid)
-			return pid
-		end
-		local pid_file = io.open(pid_fp, 'w')
-		pid_file:write(pid)
-		pid_file:close()
-	end
-	ret.spawn_on_schedule = function(prog, pid_fp)
 		if prog.delay then
 			ret.logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
 			local timer = gears.timer({
 				timeout = prog.delay,
 				callback = function()
+					prog.delay = false
 					ret.spawn(prog, pid_fp)
 				end,
 				single_shot = true
 			})
 			timer:start()
 		else
-			ret.spawn(prog, pid_fp)
-		end
-	end
-	ret.run = function(prog, pid_fp)
-		if gears.filesystem.file_readable(pid_fp) then
-			if prog.respawn_on_awesome_restart == true then
+			local pid = awful.spawn.with_line_callback(prog.bin, {
+				stdout = function(line)
+					ret.logger:info(prog.name .. ':' .. line)
+				end,
+				stderr = function(line)
+					ret.logger:error(prog.name .. ':' .. line)
+				end,
+				exit = function(reason, code)
+					if reason == 'exit' then
+						ret.logger:warn(prog.name .. ' exited with code: ' .. code)
+					elseif reason == 'signal' then
+						ret.logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
+					else
+						ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
+					end
+					if os.remove(pid_fp) then
+						ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+					else
+						ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+					end
+				end
+			})
+			if type(pid) == "string" then
+				ret.logger:fatal(pid)
+				return pid
+			end
+			local pid_file = io.open(pid_fp, 'w')
+			pid_file:write(pid)
+			pid_file:close()
+			awesome.connect_signal("exit", function(reason_restart)
 				local pid_file = io.open(pid_fp, 'r')
 				local pid = pid_file:read("*n")
 				ret.logger:debug('pid of ' .. prog.name .. ' is: ' .. pid)
 				if awesome.kill(pid, awesome.unix_signal['SIGTERM']) then
-					os.remove(pid_fp)
+					pid_file:close()
+					if os.remove(pid_fp) then
+						ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+					else
+						ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+					end
 				else
 					ret.logger:info('killing ' .. prog.name .. ' failed' )
 				end
-				ret.spawn_on_schedule(prog, pid_fp)
-			end
-		else
-			ret.logger:error('The pid file of ' .. prog.name .. ' was not found!')
-			ret.spawn_on_schedule(prog, pid_fp)
+				if reason_restart and prog.respawn_on_awesome_restart then
+					ret.spawn(prog, pid_fp)
+				end
+			end)
 		end
 	end
 	ret.run_all = function()
 		for i = 1,#config.programs do
 			local pid_fp = config.programs[i].pid_fp or config.pids_path .. config.programs[i].name .. '.pid'
 			ret.logger:debug('The pid file path of ' .. config.programs[i].name .. ' is: ' .. pid_fp)
-			ret.run(config.programs[i], pid_fp)
+			ret.spawn(config.programs[i], pid_fp)
 		end
 	end
 	return ret
