@@ -51,53 +51,54 @@ autostart.new = function(config)
 			})
 			timer:start()
 		else
-			local pid = awful.spawn.with_line_callback(prog.bin, {
-				stdout = function(line)
-					ret.logger:info(prog.name .. ':' .. line)
-				end,
-				stderr = function(line)
-					ret.logger:error(prog.name .. ':' .. line)
-				end,
-				exit = function(reason, code)
-					if reason == 'exit' then
-						ret.logger:warn(prog.name .. ' exited with code: ' .. code)
-					elseif reason == 'signal' then
-						ret.logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
-					else
-						ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
+			if not gears.filesystem.file_readable(pid_fp) then
+				local pid = awful.spawn.with_line_callback(prog.bin, {
+					stdout = function(line)
+						ret.logger:info(prog.name .. ':' .. line)
+					end,
+					stderr = function(line)
+						ret.logger:error(prog.name .. ':' .. line)
+					end,
+					exit = function(reason, code)
+						if reason == 'exit' then
+							ret.logger:warn(prog.name .. ' exited with code: ' .. code)
+						elseif reason == 'signal' then
+							ret.logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
+						else
+							ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
+						end
+						if os.remove(pid_fp) then
+							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+						else
+							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+						end
 					end
-					if os.remove(pid_fp) then
-						ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
-					else
-						ret.logger:warn('Failed to remove pid file for ' .. prog.name)
-					end
+				})
+				if type(pid) == "string" then
+					ret.logger:fatal(pid)
+					return pid
 				end
-			})
-			if type(pid) == "string" then
-				ret.logger:fatal(pid)
-				return pid
+				local pid_file = io.open(pid_fp, 'w')
+				pid_file:write(pid)
+				pid_file:close()
 			end
-			local pid_file = io.open(pid_fp, 'w')
-			pid_file:write(pid)
-			pid_file:close()
 			awesome.connect_signal("exit", function(reason_restart)
 				local pid_file = io.open(pid_fp, 'r')
 				local pid = pid_file:read("*n")
 				ret.logger:debug('pid of ' .. prog.name .. ' is: ' .. pid)
-				-- usefull only when having patch:
-				-- https://github.com/awesomeWM/awesome/commit/b3311674d2073a0fdea35f033dcc06d6373d4873.patch
-				if awesome.kill(-pid, awesome.unix_signal['SIGTERM']) then
-					pid_file:close()
-					if os.remove(pid_fp) then
-						ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+				if not reason_restart or (reason_restart and prog.respawn_on_awesome_restart)  then
+					-- usefull only when having patch:
+					-- https://github.com/awesomeWM/awesome/commit/b3311674d2073a0fdea35f033dcc06d6373d4873.patch
+					if awesome.kill(-pid, awesome.unix_signal['SIGTERM']) then
+						pid_file:close()
+						if os.remove(pid_fp) then
+							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+						else
+							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+						end
 					else
-						ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+						ret.logger:info('killing ' .. prog.name .. '(pid ' .. pid .. ') failed' )
 					end
-				else
-					ret.logger:info('killing ' .. prog.name .. '(pid ' .. pid .. ') failed' )
-				end
-				if reason_restart and prog.respawn_on_awesome_restart then
-					ret.spawn(prog, pid_fp)
 				end
 			end)
 		end
