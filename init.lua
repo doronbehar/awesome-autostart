@@ -94,7 +94,7 @@ autostart.new = function(config)
 						ret.logger:warn('Failed to remove pid file for ' .. prog.name)
 					end
 				else
-					ret.logger:info('killing ' .. prog.name .. ' failed' )
+					ret.logger:info('killing ' .. prog.name .. '(pid ' .. pid .. ') failed' )
 				end
 				if reason_restart and prog.respawn_on_awesome_restart then
 					ret.spawn(prog, pid_fp)
