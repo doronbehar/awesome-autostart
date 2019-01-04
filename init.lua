@@ -31,12 +31,6 @@ autostart.new = function(config)
 		}
 	})
 	ret.logger = Logger(config.log.handler, config.log.settings)
-	if gears.filesystem.make_directories(config.pids_path) then
-		ret.logger:debug('Creating directories for pid files: ' .. config.pids_path)
-	else
-		ret.logger:fatal('Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path)
-		return nil, 'Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path
-	end
 	-- table that will save pid
 	ret.pids = {}
 	ret.spawn = function(prog)
