@@ -27,14 +27,26 @@ autostart.new = function(config)
 				handler = function(self, level, message)
 					io.stdout:write(level .. '\t' .. message .. '\n')
 				end,
-			}
+			},
+			pids_path = os.getenv('XDG_RUNTIME_DIR') .. '/awesome/autostart/' .. os.getenv('XDG_SESSION_ID') .. '/'
 		}
 	})
 	ret.logger = Logger(config.log.handler, config.log.settings)
+	if gears.filesystem.make_directories(config.pids_path) then
+		ret.logger:debug('Creating directories for pid files: ' .. config.pids_path)
+	else
+		ret.logger:fatal('Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path)
+		return nil, 'Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path
+	end
 	-- table that will save pid
 	ret.pids = {}
+	-- table that will save pid files' paths
+	ret.pid_fps = {}
+	for _, prog in ipairs(config.programs) do
+		ret.pid_fps[prog.name] = prog.pid_fp or config.pids_path .. prog.name
+		ret.logger:info("pid file path of " .. prog.name .. " is " .. ret.pid_fps[prog.name])
+	end
 	ret.spawn = function(prog)
-		local pid
 		if prog.delay then
 			ret.logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
 			local timer = gears.timer({
@@ -47,34 +59,55 @@ autostart.new = function(config)
 			})
 			timer:start()
 		else
-			pid = awful.spawn.with_line_callback(prog.bin, {
-				stdout = function(line)
-					ret.logger:info(prog.name .. ':' .. line)
-				end,
-				stderr = function(line)
-					ret.logger:error(prog.name .. ':' .. line)
-				end,
-				exit = function(reason, code)
-					if reason == 'exit' then
-						ret.logger:warn(prog.name .. ' exited with code: ' .. code)
-					elseif reason == 'signal' then
-						ret.logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
-					else
-						ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
+			if not gears.filesystem.file_readable(ret.pid_fps[prog.name]) then
+				local pid = awful.spawn.with_line_callback(prog.bin, {
+					stdout = function(line)
+						ret.logger:info(prog.name .. ':' .. line)
+					end,
+					stderr = function(line)
+						ret.logger:error(prog.name .. ':' .. line)
+					end,
+					exit = function(reason, code)
+						if reason == 'exit' then
+							ret.logger:warn(prog.name .. ' exited with code: ' .. code)
+						elseif reason == 'signal' then
+							ret.logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
+						else
+							ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
+						end
+						if os.remove(pid_fp) then
+							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+						else
+							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+						end
+						ret.pids[prog.name] = nil
 					end
-					ret.pids[prog.name] = nil
+				})
+				if type(pid) == "string" then
+					ret.logger:fatal(pid)
+					return pid
+				else
+					ret.pids[prog.name] = pid
 				end
-			})
-			if type(pid) == "string" then
-				ret.logger:fatal(pid)
-				return pid
+				local pid_file = io.open(ret.pid_fps[prog.name], 'w')
+				pid_file:write(pid)
+				pid_file:close()
+			else
+				local pid_file = io.open(ret.pid_fps[prog.name], 'r')
+				ret.pids[prog.name] = pid_file:read("*n")
+				pid_file:close()
 			end
 			awesome.connect_signal("exit", function(reason_restart)
 				ret.logger:debug('pid of ' .. prog.name .. ' is: ' .. ret.pids[prog.name])
 				if not reason_restart or (reason_restart and prog.respawn_on_awesome_restart)  then
 					-- usefull only when having patch:
 					-- https://github.com/awesomeWM/awesome/commit/b3311674d2073a0fdea35f033dcc06d6373d4873.patch
-					if awesome.kill(-pid, awesome.unix_signal['SIGTERM']) then
+					if awesome.kill(-ret.pids[prog.name], awesome.unix_signal['SIGTERM']) then
+						if os.remove(ret.pid_fps[prog.name]) then
+							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+						else
+							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+						end
 						ret.pids[prog.name] = nil
 					else
 						ret.logger:info('killing ' .. prog.name .. '(pid ' .. pid .. ') failed' )
@@ -82,7 +115,6 @@ autostart.new = function(config)
 				end
 			end)
 		end
-		ret.pids[prog.name] = pid
 	end
 	ret.is_running = function(name)
 		return ret.pids[name]
@@ -91,8 +123,8 @@ autostart.new = function(config)
 		return awesome.kill(-ret.pids[name], awesome.unix_signal['SIGTERM'])
 	end
 	ret.run_all = function()
-		for i = 1,#config.programs do
-			ret.spawn(config.programs[i])
+		for _, prog in ipairs(config.programs) do
+			ret.spawn(prog)
 		end
 	end
 	return ret
