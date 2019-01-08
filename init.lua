@@ -75,7 +75,7 @@ autostart.new = function(config)
 						else
 							ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
 						end
-						if os.remove(pid_fp) then
+						if os.remove(ret.pid_fps[prog.name]) then
 							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
 						else
 							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
