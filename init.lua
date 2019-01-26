@@ -59,7 +59,8 @@ autostart.new = function(config)
 			})
 			timer:start()
 		else
-			if not gears.filesystem.file_readable(ret.pid_fps[prog.name]) then
+			local pid_fp = ret.pid_fps[prog.name] or prog.pid_fp or config.pids_path .. prog.name
+			if not gears.filesystem.file_readable(pid_fp) then
 				local pid = awful.spawn.with_line_callback(prog.bin, {
 					stdout = function(line)
 						ret.logger:info(prog.name .. ':' .. line)
@@ -75,7 +76,7 @@ autostart.new = function(config)
 						else
 							ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
 						end
-						if os.remove(ret.pid_fps[prog.name]) then
+						if os.remove(pid_fp) then
 							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
 						else
 							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
@@ -89,13 +90,14 @@ autostart.new = function(config)
 				else
 					ret.pids[prog.name] = pid
 				end
-				local pid_file = io.open(ret.pid_fps[prog.name], 'w')
+				local pid_file = io.open(pid_fp, 'w')
 				pid_file:write(pid)
 				pid_file:close()
 			else
-				local pid_file = io.open(ret.pid_fps[prog.name], 'r')
+				local pid_file = io.open(pid_fp, 'r')
 				ret.pids[prog.name] = pid_file:read("*n")
 				pid_file:close()
+				return "pid for such a program already exists: " .. tostring(ret.pids[prog.name])
 			end
 			awesome.connect_signal("exit", function(reason_restart)
 				ret.logger:debug('pid of ' .. prog.name .. ' is: ' .. ret.pids[prog.name])
@@ -103,7 +105,7 @@ autostart.new = function(config)
 					-- usefull only when having patch:
 					-- https://github.com/awesomeWM/awesome/commit/b3311674d2073a0fdea35f033dcc06d6373d4873.patch
 					if awesome.kill(-ret.pids[prog.name], awesome.unix_signal['SIGTERM']) then
-						if os.remove(ret.pid_fps[prog.name]) then
+						if os.remove(pid_fp) then
 							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
 						else
 							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
