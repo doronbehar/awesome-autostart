@@ -5,8 +5,6 @@ local naughty = require("naughty")
 pcall(require, "luarocks.loader")
 local Logger = require('logger')
 
-local inspect = require('inspect')
-
 local autostart = {}
 autostart.new = function(config)
 	local ret = {}
