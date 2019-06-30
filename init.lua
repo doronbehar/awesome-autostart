@@ -46,8 +46,17 @@ autostart.new = function(config)
 		ret.logger:info("pid file path of " .. prog.name .. " is " .. ret.pid_fps[prog.name])
 	end
 	ret.spawn = function(prog)
+		local logger
+		if prog.log then
+			setmetatable(prog.log, {
+				__index = config.log
+			})
+			logger = Logger(prog.log.handler, prog.log.settings)
+		else
+			logger = ret.logger
+		end
 		if prog.delay then
-			ret.logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
+			logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
 			local timer = gears.timer({
 				timeout = prog.delay,
 				callback = function()
@@ -62,29 +71,29 @@ autostart.new = function(config)
 			if not gears.filesystem.file_readable(pid_fp) then
 				local pid = awful.spawn.with_line_callback(prog.bin, {
 					stdout = function(line)
-						ret.logger:info(prog.name .. ':' .. line)
+						logger:info(prog.name .. ':' .. line)
 					end,
 					stderr = function(line)
-						ret.logger:error(prog.name .. ':' .. line)
+						logger:error(prog.name .. ':' .. line)
 					end,
 					exit = function(reason, code)
 						if reason == 'exit' then
-							ret.logger:warn(prog.name .. ' exited with code: ' .. code)
+							logger:warn(prog.name .. ' exited with code: ' .. code)
 						elseif reason == 'signal' then
-							ret.logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
+							logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
 						else
-							ret.logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
+							logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
 						end
 						if os.remove(pid_fp) then
-							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+							logger:debug('Succesfully removed pid file for ' .. prog.name)
 						else
-							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+							logger:warn('Failed to remove pid file for ' .. prog.name)
 						end
 						ret.pids[prog.name] = nil
 					end
 				})
 				if type(pid) == "string" then
-					ret.logger:fatal(pid)
+					logger:fatal(pid)
 					return pid
 				else
 					ret.pids[prog.name] = pid
@@ -99,19 +108,19 @@ autostart.new = function(config)
 				return "pid for such a program already exists: " .. tostring(ret.pids[prog.name])
 			end
 			awesome.connect_signal("exit", function(reason_restart)
-				ret.logger:debug('pid of ' .. prog.name .. ' is: ' .. ret.pids[prog.name])
+				logger:debug('pid of ' .. prog.name .. ' is: ' .. ret.pids[prog.name])
 				if not reason_restart or (reason_restart and prog.respawn_on_awesome_restart)  then
 					-- usefull only when having patch:
 					-- https://github.com/awesomeWM/awesome/commit/b3311674d2073a0fdea35f033dcc06d6373d4873.patch
 					if awesome.kill(-ret.pids[prog.name], awesome.unix_signal['SIGTERM']) then
 						if os.remove(pid_fp) then
-							ret.logger:debug('Succesfully removed pid file for ' .. prog.name)
+							logger:debug('Succesfully removed pid file for ' .. prog.name)
 						else
-							ret.logger:warn('Failed to remove pid file for ' .. prog.name)
+							logger:warn('Failed to remove pid file for ' .. prog.name)
 						end
 						ret.pids[prog.name] = nil
 					else
-						ret.logger:info('killing ' .. prog.name .. '(pid ' .. pid .. ') failed' )
+						logger:info('killing ' .. prog.name .. '(pid ' .. pid .. ') failed' )
 					end
 				end
 			end)
