@@ -3,6 +3,7 @@ local awful = require("awful")
 local naughty = require("naughty")
 
 pcall(require, "luarocks.loader")
+-- https://gitlab.com/doronbehar/lua-logger
 local Logger = require('logger')
 
 local autostart = {}
