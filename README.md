@@ -14,7 +14,9 @@ Usually, what most users want is to define a list of system tray applications th
 
 ### Installation
 
-I recommend most people to just clone it to your `awesome` configuration dir (usually `~/.config/awesome`) and it should be usable right after you configure it as explained in more details later on. There is one dependency though which is [`lua-logger`](https://github.com/doronbehar/lua-logger) so **Remember to [install](https://github.com/doronbehar/lua-logger#installation) it as well and keep it updated as long as you keep updating this repo as well.**
+```sh
+luarocks install awesome-autostart
+```
 
 ### Usage
 
