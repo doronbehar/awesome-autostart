@@ -1,25 +1,24 @@
-local gears = require("gears")
 local awful = require("awful")
+local gears = require("gears")
 local naughty = require("naughty")
+local basename = require('posix.libgen').basename
+-- * for debugging
+--local inspect = require('pl.import_into')().pretty.write
 
 pcall(require, "luarocks.loader")
 -- https://gitlab.com/doronbehar/lua-logger
 local Logger = require('logger')
 
-local autostart = {}
-autostart.new = function(config)
-	local ret = {}
+local Autostart = {}
+function Autostart:new(config)
 	if type(config) ~= 'table' then
 		config = {}
 	end
-	-- Setting must values for config object through __index metatable value.
 	setmetatable(config, {
 		__index = {
 			programs = {
 				{
-					name = 'non',
 					bin = {'/bin/echo', 'no autostart program was configured!'},
-					respawn_on_awesome_restart = true
 				}
 			},
 			log = {
@@ -30,114 +29,93 @@ autostart.new = function(config)
 			pids_path = os.getenv('XDG_RUNTIME_DIR') .. '/awesome/autostart/' .. os.getenv('XDG_SESSION_ID') .. '/'
 		}
 	})
-	ret.logger = Logger(config.log.handler, config.log.settings)
-	if gears.filesystem.make_directories(config.pids_path) then
-		ret.logger:debug('Creating directories for pid files: ' .. config.pids_path)
+	o = {
+		config = config,
+		logger = Logger(config.log.handler, config.log.settings),
+		-- table that will save pid
+		pids = {}
+	}
+	setmetatable(o, self)
+	self.__index = self
+	return o
+end
+function Autostart:spawn(prog)
+	if not prog.name then
+		if type(prog.bin) == "table" then
+			prog.name = basename(prog.bin[1])
+		elseif type(prog.bin) == "string" then
+			prog.name = basename(prog.bin)
+		end
+	end
+	local logger
+	if prog.log then
+		setmetatable(prog.log, {
+			__index = self.config.log
+		})
+		logger = Logger(prog.log.handler, prog.log.settings)
 	else
-		ret.logger:fatal('Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path)
-		return nil, 'Couldn\'t create directories for logs, check the permissions and existence of ' .. config.log.dir_path
+		logger = self.logger
 	end
-	-- table that will save pid
-	ret.pids = {}
-	-- table that will save pid files' paths
-	ret.pid_fps = {}
-	for _, prog in ipairs(config.programs) do
-		ret.pid_fps[prog.name] = prog.pid_fp or config.pids_path .. prog.name
-		ret.logger:info("pid file path of " .. prog.name .. " is " .. ret.pid_fps[prog.name])
+	if prog.delay then
+		logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
+		local timer = gears.timer({
+			timeout = prog.delay,
+			callback = function()
+				prog.delay = false
+				self:spawn(prog)
+			end,
+			single_shot = true
+		})
+		return timer:start()
 	end
-	ret.spawn = function(prog)
-		local logger
-		if prog.log then
-			setmetatable(prog.log, {
-				__index = config.log
-			})
-			logger = Logger(prog.log.handler, prog.log.settings)
-		else
-			logger = ret.logger
-		end
-		if prog.delay then
-			logger:debug('Creating timer for configured with delay autostart program ' .. prog.name)
-			local timer = gears.timer({
-				timeout = prog.delay,
-				callback = function()
-					prog.delay = false
-					ret.spawn(prog)
-				end,
-				single_shot = true
-			})
-			timer:start()
-		else
-			local pid_fp = ret.pid_fps[prog.name] or prog.pid_fp or config.pids_path .. prog.name
-			if not gears.filesystem.file_readable(pid_fp) then
-				local pid = awful.spawn.with_line_callback(prog.bin, {
-					stdout = function(line)
-						logger:info(prog.name .. ':' .. line)
-					end,
-					stderr = function(line)
-						logger:error(prog.name .. ':' .. line)
-					end,
-					exit = function(reason, code)
-						if reason == 'exit' then
-							logger:warn(prog.name .. ' exited with code: ' .. code)
-						elseif reason == 'signal' then
-							logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
-						else
-							logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
-						end
-						if os.remove(pid_fp) then
-							logger:debug('Succesfully removed pid file for ' .. prog.name)
-						else
-							logger:warn('Failed to remove pid file for ' .. prog.name)
-						end
-						ret.pids[prog.name] = nil
-					end
-				})
-				if type(pid) == "string" then
-					logger:fatal(pid)
-					return pid
-				else
-					ret.pids[prog.name] = pid
-				end
-				local pid_file = io.open(pid_fp, 'w')
-				pid_file:write(pid)
-				pid_file:close()
+	if self.pids[prog.name] then
+		return "pid for such a program already exists: " .. tostring(self.pids[prog.name])
+	end
+	local pid = awful.spawn.with_line_callback(prog.bin, {
+		stdout = function(line)
+			logger:info(prog.name .. ':' .. line)
+		end,
+		stderr = function(line)
+			logger:error(prog.name .. ':' .. line)
+		end,
+		exit = function(reason, code)
+			if reason == 'exit' then
+				logger:warn(prog.name .. ' exited with code: ' .. code)
+			elseif reason == 'signal' then
+				logger:warn(prog.name .. ' exited because it recieved signal ' .. code)
 			else
-				local pid_file = io.open(pid_fp, 'r')
-				ret.pids[prog.name] = pid_file:read("*n")
-				pid_file:close()
-				return "pid for such a program already exists: " .. tostring(ret.pids[prog.name])
+				logger:warn(prog.name .. ' exited with unknown reason: ' .. code)
 			end
-			awesome.connect_signal("exit", function(reason_restart)
-				logger:debug('pid of ' .. prog.name .. ' is: ' .. ret.pids[prog.name])
-				if not reason_restart or (reason_restart and prog.respawn_on_awesome_restart)  then
-					-- usefull only when having patch:
-					-- https://github.com/awesomeWM/awesome/commit/b3311674d2073a0fdea35f033dcc06d6373d4873.patch
-					if awesome.kill(-ret.pids[prog.name], awesome.unix_signal['SIGTERM']) then
-						if os.remove(pid_fp) then
-							logger:debug('Succesfully removed pid file for ' .. prog.name)
-						else
-							logger:warn('Failed to remove pid file for ' .. prog.name)
-						end
-						ret.pids[prog.name] = nil
-					else
-						logger:info('killing ' .. prog.name .. '(pid ' .. pid .. ') failed' )
-					end
-				end
-			end)
+			self.pids[prog.name] = nil
 		end
+	})
+	if type(pid) == "string" then
+		logger:fatal(pid)
+		return pid
 	end
-	ret.is_running = function(name)
-		return ret.pids[name]
-	end
-	ret.kill_by_name = function(name)
-		return awesome.kill(-ret.pids[name], awesome.unix_signal['SIGTERM'])
-	end
-	ret.run_all = function()
-		for _, prog in ipairs(config.programs) do
-			ret.spawn(prog)
+	-- otherwise, we save the pid in our self.pids table
+	self.pids[prog.name] = pid
+	awesome.connect_signal("exit", function(reason_restart)
+		logger:debug('pid of ' .. prog.name .. ' is: ' .. self.pids[prog.name])
+		-- usefull only when having patch:
+		-- https://github.com/awesomeWM/awesome/commit/b3311674d2073a0fdea35f033dcc06d6373d4873.patch
+		if awesome.kill(-self.pids[prog.name], awesome.unix_signal['SIGTERM']) then
+			logger:debug('Succesfully killed ' .. prog.name)
+		else
+			logger:info('killing ' .. prog.name .. '(pid ' .. pid .. ') failed' )
 		end
+	end)
+end
+function Autostart:is_running(name)
+	return self.pids[name]
+end
+function Autostart:kill_by_name(name)
+	return awesome.kill(-self.pids[name], awesome.unix_signal['SIGTERM'])
+end
+function Autostart:run_all()
+	for _, prog in ipairs(self.config.programs) do
+		self:spawn(prog)
 	end
-	return ret
 end
 
-return autostart
+return Autostart
