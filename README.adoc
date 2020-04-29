@@ -11,20 +11,24 @@ module strives to provide a comfortable way to manage applications which
 should be started automatically when one opens a new `awesome` session.
 
 Usually, what most users want is to define a list of system tray
-applications that should be started when running `startx`. Most people
-are satisfied with putting those shell commands in `~/.xprofile` but
-this has some drawbacks:
+applications that should be started when running `startx`. Most people are
+satisfied with putting those shell commands in `~/.xprofile`. However, this has
+some drawbacks:
 
 * No notifications when a program exits unexpectedly.
 * The `STDOUT` of the programs is naturally printed in the tty from
 which `startx` was invoked, meaning there’s no native support for log
 files / desktop notifications for messages which those programs usually
 print to the tty’s `STDERR`.
-* With `~/.xprofile`, if you restart `awesome`, there is no way to tell
-an applications which need a consistent system tray handler you want to
-restart it *together* with `awesome` and perhaps even after a small
-delay. (More details about this specific problem and it’s solution in
-link:#Usage[Usage])
+* Sometimes, applications are written in such a way that if Awesome is
+restarted, the sys tray icon disappears. But if you restart them after Awesome
+has restarted, you do see the tray icon. With `~/.xprofile` This is not
+possible unless you construct hacky bash scripts.  
+* Sometimes, programs don't exit if they were started from `~/.xprofile`, one
+example I'm aware of is http://jonls.dk/redshift/[Redshift-gtk].
+
+Awesome-autostart strives to solve these issues by putting these programs under
+awesome's control.
 
 == Installation
 
@@ -40,123 +44,61 @@ Import the module to your `rc.lua`:
 [source,lua]
 ----
 local Autostart = require('autostart')
--- ...
--- Whenever you wish, invoke the function `autostart` with your `autostart_config` table.
--- Usually, it is recommended to do so after defining all the tags, tasklist and widgets in `rc.lua`.
+----
 
-autostart_config = {
-  -- ... More details on configuration latter ...
+Now use it like this:
+
+[source,lua]
+----
+local autostart_config = {
+  programs = {
+    {
+      -- Whether to delay the start of the program after awesome starts
+      delay = 1,
+      -- You don't have to use a full path here, it's only for illustration
+      bin = {'/usr/bin/polybar', 'default'},
+    },
+    {
+      bin = {'/usr/bin/redshift-gtk'}
+    },
+  },
+  log = {
+    handler = function (self, level, nessage)
+      naughty.notify({
+        preset = naughty.config.presets.critical,
+        title = "Autostart module " .. level .. "::",
+        timeout = 10,
+        text = message
+      })
+    end,
+    settings = {
+      init_level = "ERROR"
+    }
+  }
 }
-
-local autostarter = Autostart(autostart_config)
-autostarter.run_all()
+-- It is recommended to put this right after all the widgets, the tags and the 
+-- `tasklist` are set.
+autostart = Autostart:new(autostart_config)
+autostart:run_all()
 ----
 
 == Configuration
 
-=== Abstract
+Most of what's examplified in the usage section I think is self explanatory.
+But the `log` configuration key is worth perhaps a bit more explanation:
 
-First of all, the configuration consists of two sections and it can look
-like:
+The `handler` key is expecting a function that is passed to
+http://github.com/doronbehar/lua-logger[lua-logger] which is essentially an
+appender function, so a bit more details are explained
+https://github.com/doronbehar/lua-logger#the-appender-function[here].
 
-[source,lua]
-----
-return {
-  programs = {
-    -- array of a table for each program as explaind later on
-  }
-  log = {
-    handler = function (self, level, message) 
-      -- a logger function that handles the log info and outputs it to the
-      -- console, the desktop session or to a file, your choice.
-      -- If you don't feel creative enough to create something usefull here,
-      -- you can check the examples in the repositories dir `examples/`.
-    end,
-    settings = {
-      -- a set of parameters that define the default settings of the logger table
-      -- More detailes later on..
-    }
-  }
-}
-----
+Similarly, the `settings` table is passed to
+http://github.com/doronbehar/lua-logger[lua-logger] and it is explained
+https://github.com/doronbehar/lua-logger#the-settings-table[here].
 
-=== Configuring Programs
+== Advanced usage
 
-A configuration for each autostart program is needed for two scenarios:
-
-* A program needed to run with `awesome` exits when there is no system
-tray handler (like `awesome`’s widget `wibox.widget.systray()`). Here
-are some examples (tested on my machine, YMMV):
-** `gnubiff`
-** `polybar` - Sometimes prints weird things after awesome restarts.
-* A program needs to be started in delay (I know you can `sleep` in your
-`~/.xprofile` but `awesome-autostart` strives to solve this as well more
-elegantly).
-* A program needs to run and quit but you want still to know if it
-exited with non-zero value.
-
-Here is an example of a `programs` table to put in `autostart_config`
-table to give as an argument to `autostart()`:
-
-[source,lua]
-----
-programs = {
-  name = 'polybar', -- Used when creating log files, don't put here spaces or other special characters
-  delay = 1, -- start in delay after awesome (re)starts
-  bin = {'/usr/bin/polybar', 'default'}, -- array (or just a string) of a command and it's arguments to run for this autostart entry
-}
-----
-
-Here is another example of program with the `oneshot` variable set to
-`true`:
-
-[source,lua]
-----
-{
-  name = 'xradnr-fix',
-  bin = {'/usr/bin/xrandr', '--output', 'HDMI1', '--left-of', 'VGA1'},
-  oneshot = true -- Specifies that this autstart program should not be expected to run continuously
-}
-----
-
-=== Configuring the `log`
-
-The `autostart` module depends on a library I forked which is now called
-http://github.com/doronbehar/lua-logger[lua-logger]. The `log` table’s
-`handler` function and the `settings` table are meant to become the
-input of the Logger constructor as explained
-http://github.com/doronbehar/lua-logger#usage[here].
-
-The `log` table should consist of a function called `handler` and a
-`settings` table. They both correspond to what the
-
-==== The `settings` table
-
-See
-http://github.com/doronbehar/lua-logger#configuration[lua-logger/README.md#configuration]
-
-==== The `handler` function
-
-See
-http://github.com/doronbehar/lua-logger#the-appender-function[lua-logger/README.md#the-appender-function]
-
-== Recommended usage
-
-A full example of a configuration file is included in the repository.
-You can copy, edit it and write it `autostart/config.lua`. It will be
-ignored by the `autostart` repo and you can put this in your AwesomeWM’s
-`rc.lua`:
-
-[source,lua]
-----
-local autostarter = autostart(require('autostart/config'))
-autostarter.run()
-----
-
-It is recommended to put this right after all the widgets, the tags and
-the `tasklist` are set.
-
-Later on, you can bind keys to raise or lower the logging level with
+You can bind keys to raise or lower the logging level with
 this functions:
 
 [source,lua]
