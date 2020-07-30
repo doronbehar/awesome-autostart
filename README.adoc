@@ -1,5 +1,7 @@
 = Awesome WM autostart module
 
+WARNING: I don't use this module as I moved to Gnome and Gdm. Feel free to fork.
+
 ____
 autostart made easy
 ____
